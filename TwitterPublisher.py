@@ -9,7 +9,8 @@ class TwitterPublisher(StreamListener):
     def __init__(self, project_id, topic_id):
         self.project_id = project_id
         self.topic_id = topic_id
-        self.publisher = pubsub_v1.PublisherClient()
+        self.batch_settings = pubsub_v1.types.BatchSettings(max_messages = 100, max_bytes = 1024)
+        self.publisher = pubsub_v1.PublisherClient(self.batch_settings)
         self.topic_path = self.publisher.topic_path(self.project_id, self.topic_id)
         self.publish_futures = []
 
@@ -39,9 +40,10 @@ class TwitterPublisher(StreamListener):
             return callback
 
     def publish_to_topic(self, data):
-        publish_future = self.publisher.publish(self.topic_path, data = data.encode('utf-8'))
-        #publish_future.add_done_callback(self.get_callback(publish_future, extracted_data))
-        self.publish_futures.append(publish_future)
+        for i in range(1, 100):
+            publish_future = self.publisher.publish(self.topic_path, data = data.encode('utf-8'))
+            #publish_future.add_done_callback(self.get_callback(publish_future, extracted_data))
+            self.publish_futures.append(publish_future)
 
 
 
