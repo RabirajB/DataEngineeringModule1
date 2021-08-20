@@ -3,8 +3,9 @@ from tweepy import OAuthHandler
 from tweepy.streaming import StreamListener
 import json
 import sys
-from concurrent import futures
 from google.cloud import pubsub_v1
+from google.cloud.pubsub_v1.futures import Future
+
 class TwitterPublisher(StreamListener):
     def __init__(self, project_id, topic_id):
         self.project_id = project_id
@@ -13,6 +14,8 @@ class TwitterPublisher(StreamListener):
         self.publisher = pubsub_v1.PublisherClient(self.batch_settings)
         self.topic_path = self.publisher.topic_path(self.project_id, self.topic_id)
         self.publish_futures = []
+        self.i = 0
+        self.l = []
 
     #These are the listener methods for tweepy class
     def on_data(self, raw_data):
@@ -24,7 +27,7 @@ class TwitterPublisher(StreamListener):
         json_data = json.loads(raw_data)
         extracted_data = {"id": json_data['id'], "text":json_data['text']}
         print(extracted_data)
-        self.publish_to_topic(raw_data)
+        self.publish_to_topic(extracted_data)
 
     def on_error(self, status_code):
         if status_code == 420:
@@ -37,14 +40,22 @@ class TwitterPublisher(StreamListener):
             except futures.TimeoutError:
                 print(f"Publishing {data} timed out.")
 
-            return callback
+        return callback
 
     def publish_to_topic(self, data):
-        for i in range(1, 100):
-            publish_future = self.publisher.publish(self.topic_path, data = data.encode('utf-8'))
-            #publish_future.add_done_callback(self.get_callback(publish_future, extracted_data))
+        if self.i == 100:
+            s_data = json.dumps(self.l)
+            publish_future = self.publisher.publish(self.topic_path, data = s_data.encode('utf-8'))
+            print(type(publish_future))
+            publish_future.add_done_callback(self.get_callback(publish_future, data))
             self.publish_futures.append(publish_future)
-
+            self.i = 0
+            self.l = []
+            return
+        else:
+            self.i += 1
+            self.l.append(data)
+            return
 
 
 
